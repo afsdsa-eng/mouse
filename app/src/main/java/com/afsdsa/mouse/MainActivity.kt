@@ -4,6 +4,7 @@ import android.app.Activity
 import android.os.Bundle
 import android.view.InputDevice
 import android.view.MotionEvent
+import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.LinearLayout
@@ -24,6 +25,7 @@ class MainActivity : Activity() {
     private val keys = listOf("left", "right", "middle", "back", "forward")
     private val spinners = mutableListOf<Spinner>()
     private lateinit var eventLog: TextView
+    private lateinit var rightClickTestArea: TextView
     private val logLines = ArrayDeque<String>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -76,12 +78,33 @@ class MainActivity : Activity() {
         })
 
         root.addView(TextView(this).apply {
-            text = "マウス入力テスト"
+            text = "右ボタン変換テスト"
+            textSize = 20f
+            setPadding(0, 24, 0, 8)
+        })
+        rightClickTestArea = TextView(this).apply {
+            text = "ここにマウスポインターを置いて右ボタンを押してください。\n右クリックとして認識されると、この表示が変わります。"
+            textSize = 15f
+            setPadding(18, 28, 18, 28)
+            setBackgroundResource(android.R.drawable.dialog_holo_light_frame)
+            isClickable = true
+            setOnContextClickListener {
+                text = "右クリックを検出しました！\n物理的な「戻る」ボタン入力を、アプリ内で右クリックとして扱いました。"
+                Toast.makeText(this@MainActivity, "右クリックに変換しました（このアプリ内のみ）", Toast.LENGTH_SHORT).show()
+                true
+            }
+        }
+        root.addView(rightClickTestArea, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 130
+        ))
+
+        root.addView(TextView(this).apply {
+            text = "マウス入力ログ"
             textSize = 20f
             setPadding(0, 24, 0, 8)
         })
         root.addView(TextView(this).apply {
-            text = "マウスを接続し、このアプリの画面上で各ボタンを押してください。検出したイベントを下に表示します。"
+            text = "マウスを接続してボタンを押すと、検出したイベントを下に表示します。"
             textSize = 14f
         })
         eventLog = TextView(this).apply {
@@ -99,27 +122,49 @@ class MainActivity : Activity() {
 
         root.addView(TextView(this).apply {
             text = """
-                現在の制限
+                重要な制限
 
-                このテストで確認できるのは、このアプリが前面にある間にAndroidから届いた入力だけです。別のアプリの操作を監視したり、クリックを置き換えたりする機能ではありません。
+                この変換テストは、このアプリのテスト領域内だけで動作します。Android全体や他のアプリの右クリックを変更するものではありません。
 
-                rootなしの通常アプリでは、Android全体のマウス入力を自由に横取り・置換できる公開APIはありません。
+                右ボタンとサイドボタン下が、どちらも同じ「戻る」入力としてAndroidに届く場合、アプリから両者を区別できず、両方が右クリックに変換されます。別々に割り当てるには、OSが異なる入力として通知する必要があります。
             """.trimIndent()
             textSize = 14f
             setPadding(0, 20, 0, 0)
         })
 
-        setContentView(root)
+        setContentView(ScrollView(this).apply { addView(root) })
     }
 
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
-        if (isMouseEvent(event)) logMouseEvent(event, "Generic")
+        if (isMouseEvent(event)) {
+            logMouseEvent(event, "Generic")
+            if (isInsideRightClickTestArea(event) &&
+                event.actionButton == MotionEvent.BUTTON_BACK &&
+                (event.actionMasked == MotionEvent.ACTION_BUTTON_PRESS ||
+                 event.actionMasked == MotionEvent.ACTION_BUTTON_RELEASE)
+            ) {
+                if (event.actionMasked == MotionEvent.ACTION_BUTTON_PRESS) {
+                    rightClickTestArea.performContextClick()
+                    addLog("物理ボタン「戻る」→ アプリ内右クリックに変換")
+                }
+                return true
+            }
+        }
         return super.dispatchGenericMotionEvent(event)
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         if (isMouseEvent(event)) logMouseEvent(event, "Touch")
         return super.dispatchTouchEvent(event)
+    }
+
+    private fun isInsideRightClickTestArea(event: MotionEvent): Boolean {
+        val location = IntArray(2)
+        rightClickTestArea.getLocationOnScreen(location)
+        val x = event.rawX
+        val y = event.rawY
+        return x >= location[0] && x <= location[0] + rightClickTestArea.width &&
+            y >= location[1] && y <= location[1] + rightClickTestArea.height
     }
 
     private fun isMouseEvent(event: MotionEvent): Boolean {
@@ -149,11 +194,14 @@ class MainActivity : Activity() {
         }.ifEmpty { listOf("なし") }.joinToString("+")
 
         val time = SimpleDateFormat("HH:mm:ss.SSS", Locale.JAPAN).format(Date())
-        val line = "$time [$route] $action / ボタン=$pressed / buttonState=${event.buttonState} / x=${event.x.toInt()} y=${event.y.toInt()}"
+        addLog("$time [$route] $action / ボタン=$pressed / buttonState=${event.buttonState} / x=${event.x.toInt()} y=${event.y.toInt()}")
+    }
+
+    private fun addLog(line: String) {
         logLines.addFirst(line)
         while (logLines.size > 30) logLines.removeLast()
         runOnUiThread {
-            eventLog.text = logLines.joinToString("\n")
+            if (::eventLog.isInitialized) eventLog.text = logLines.joinToString("\n")
         }
     }
 }
