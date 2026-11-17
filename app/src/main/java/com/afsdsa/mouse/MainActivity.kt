@@ -2,6 +2,8 @@ package com.afsdsa.mouse
 
 import android.app.Activity
 import android.os.Bundle
+import android.content.pm.PackageManager
+import rikka.shizuku.Shizuku
 import android.view.InputDevice
 import android.view.MotionEvent
 import android.widget.ArrayAdapter
@@ -28,11 +30,26 @@ class MainActivity : Activity() {
     private val logLines = ArrayDeque<String>()
     private var backButtonWasDown = false
     private var previousButtonState = 0
+    private lateinit var shizukuStatus: TextView
+    private val shizukuPermissionCode = 1001
+    private val shizukuPermissionListener =
+        Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
+            if (requestCode == shizukuPermissionCode) {
+                updateShizukuStatus()
+                Toast.makeText(
+                    this,
+                    if (grantResult == PackageManager.PERMISSION_GRANTED) "Shizuku権限を許可しました"
+                    else "Shizuku権限が許可されませんでした",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         val prefs = getSharedPreferences("mapping", MODE_PRIVATE)
+        Shizuku.addRequestPermissionResultListener(shizukuPermissionListener)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(24, 28, 24, 24)
@@ -42,6 +59,26 @@ class MainActivity : Activity() {
             text = "マウスボタン変更"
             textSize = 26f
         })
+        root.addView(TextView(this).apply {
+            text = "Shizuku接続"
+            textSize = 19f
+            setPadding(0, 18, 0, 4)
+        })
+        shizukuStatus = TextView(this).apply {
+            textSize = 14f
+            setPadding(0, 4, 0, 8)
+        }
+        root.addView(shizukuStatus)
+        root.addView(Button(this).apply {
+            text = "Shizuku権限を確認・許可"
+            setOnClickListener { requestShizukuPermission() }
+        })
+        root.addView(TextView(this).apply {
+            text = "Shizukuが未起動の場合は、Shizukuアプリでワイヤレスデバッグから起動してください。"
+            textSize = 13f
+            setPadding(0, 4, 0, 12)
+        })
+
         root.addView(TextView(this).apply {
             text = "ボタン割り当て"
             textSize = 18f
@@ -136,6 +173,53 @@ class MainActivity : Activity() {
         })
 
         setContentView(ScrollView(this).apply { addView(root) })
+        updateShizukuStatus()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateShizukuStatus()
+    }
+
+    override fun onDestroy() {
+        Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener)
+        super.onDestroy()
+    }
+
+    private fun requestShizukuPermission() {
+        if (!Shizuku.pingBinder()) {
+            Toast.makeText(this, "Shizukuが起動していません。Shizukuアプリで起動してください。", Toast.LENGTH_LONG).show()
+            updateShizukuStatus()
+            return
+        }
+        if (Shizuku.isPreV11()) {
+            Toast.makeText(this, "Shizuku v11以降が必要です。", Toast.LENGTH_LONG).show()
+            return
+        }
+        if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, "Shizuku権限は許可済みです。", Toast.LENGTH_SHORT).show()
+        } else {
+            Shizuku.requestPermission(shizukuPermissionCode)
+        }
+        updateShizukuStatus()
+    }
+
+    private fun updateShizukuStatus() {
+        if (!::shizukuStatus.isInitialized) return
+        val running = Shizuku.pingBinder()
+        if (!running) {
+            shizukuStatus.text = "状態: 未起動"
+            return
+        }
+        val granted = !Shizuku.isPreV11() &&
+            Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+        val uid = runCatching { Shizuku.getUid() }.getOrDefault(-1)
+        val mode = when (uid) {
+            0 -> "root"
+            2000 -> "ADB / shell"
+            else -> "UID $uid"
+        }
+        shizukuStatus.text = "状態: 起動中 / 権限: ${if (granted) "許可済み" else "未許可"} / 実行モード: $mode"
     }
 
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
