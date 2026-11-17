@@ -27,6 +27,7 @@ class MainActivity : Activity() {
     private lateinit var rightClickTestArea: TextView
     private val logLines = ArrayDeque<String>()
     private var backButtonWasDown = false
+    private var previousButtonState = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -124,7 +125,9 @@ class MainActivity : Activity() {
             text = """
                 重要な制限
 
-                この変換テストは、このアプリのテスト領域内だけで動作します。Android全体や他のアプリの右クリックを変更するものではありません。
+                保存した割り当ては、テスト領域にポインターを置いた状態での動作確認に使います。Android全体や他のアプリの入力を変更するものではありません。
+
+                注意: この端末では物理右ボタンとサイドボタン2が同じBUTTON_BACKとして届くため、Android側で区別できません。現在の検出方式では両方に同じ「右ボタン」設定が適用されます。
 
                 このマウスでは、右ボタンがACTION_BUTTON_PRESSではなく、buttonState=8を含むホバー移動として通知されることを確認しました。そのためbuttonStateの変化を監視して変換します。
             """.trimIndent()
@@ -136,23 +139,49 @@ class MainActivity : Activity() {
     }
 
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
-        if (isMouseEvent(event)) {
-            logMouseEvent(event, "Generic")
-            val inTestArea = isInsideRightClickTestArea(event)
-            val backDown = event.buttonState and MotionEvent.BUTTON_BACK != 0
+        if (!isMouseEvent(event)) return super.dispatchGenericMotionEvent(event)
 
-            if (inTestArea && backDown) {
-                if (!backButtonWasDown) {
-                    rightClickTestArea.performContextClick()
-                    addLog("変換: buttonStateの戻る(8)を右クリックとして処理")
+        logMouseEvent(event, "Generic")
+        val inTestArea = isInsideRightClickTestArea(event)
+        val current = event.buttonState
+        val changed = current xor previousButtonState
+        previousButtonState = current
+
+        if (inTestArea && changed != 0) {
+            val prefs = getSharedPreferences("mapping", MODE_PRIVATE)
+            val mappings = listOf(
+                MotionEvent.BUTTON_PRIMARY to "left",
+                MotionEvent.BUTTON_SECONDARY to "right",
+                MotionEvent.BUTTON_TERTIARY to "middle",
+                MotionEvent.BUTTON_FORWARD to "back",
+                MotionEvent.BUTTON_BACK to "right"
+            )
+            var handled = false
+            mappings.forEach { (mask, key) ->
+                val pressedNow = current and mask != 0
+                val wasPressed = (current xor changed) and mask != 0
+                if (changed and mask != 0 && pressedNow && !wasPressed) {
+                    val actionIndex = prefs.getInt(key, 0).coerceIn(actions.indices)
+                    val selectedAction = actions[actionIndex]
+                    applyMappedAction(selectedAction)
+                    addLog("割り当て実行: $key → $selectedAction")
+                    handled = selectedAction != "変更なし" || handled
                 }
-                backButtonWasDown = true
-                return true
             }
-
-            if (!backDown) backButtonWasDown = false
+            if (handled) return true
         }
         return super.dispatchGenericMotionEvent(event)
+    }
+
+    private fun applyMappedAction(action: String) {
+        when (action) {
+            "左クリック", "中央クリック" -> rightClickTestArea.performClick()
+            "右クリック" -> rightClickTestArea.performContextClick()
+            "戻る" -> Toast.makeText(this, "戻る操作（テスト領域内）", Toast.LENGTH_SHORT).show()
+            "進む" -> Toast.makeText(this, "進む操作（テスト領域内）", Toast.LENGTH_SHORT).show()
+            "コピー" -> Toast.makeText(this, "コピー操作（テスト領域内）", Toast.LENGTH_SHORT).show()
+            "貼り付け" -> Toast.makeText(this, "貼り付け操作（テスト領域内）", Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
