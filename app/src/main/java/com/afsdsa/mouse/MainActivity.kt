@@ -4,7 +4,6 @@ import android.app.Activity
 import android.os.Bundle
 import android.view.InputDevice
 import android.view.MotionEvent
-import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.LinearLayout
@@ -27,6 +26,7 @@ class MainActivity : Activity() {
     private lateinit var eventLog: TextView
     private lateinit var rightClickTestArea: TextView
     private val logLines = ArrayDeque<String>()
+    private var backButtonWasDown = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -83,13 +83,13 @@ class MainActivity : Activity() {
             setPadding(0, 24, 0, 8)
         })
         rightClickTestArea = TextView(this).apply {
-            text = "ここにマウスポインターを置いて右ボタンを押してください。\n右クリックとして認識されると、この表示が変わります。"
+            text = "ここにマウスポインターを置いて右ボタンを押してください。\nbuttonStateに「戻る」が含まれる入力を右クリックに変換します。"
             textSize = 15f
             setPadding(18, 28, 18, 28)
             setBackgroundResource(android.R.drawable.dialog_holo_light_frame)
             isClickable = true
             setOnContextClickListener {
-                text = "右クリックを検出しました！\n物理的な「戻る」ボタン入力を、アプリ内で右クリックとして扱いました。"
+                text = "右クリックを検出しました！\n「戻る」ボタン入力を、このアプリ内で右クリックとして扱いました。"
                 Toast.makeText(this@MainActivity, "右クリックに変換しました（このアプリ内のみ）", Toast.LENGTH_SHORT).show()
                 true
             }
@@ -126,7 +126,7 @@ class MainActivity : Activity() {
 
                 この変換テストは、このアプリのテスト領域内だけで動作します。Android全体や他のアプリの右クリックを変更するものではありません。
 
-                右ボタンとサイドボタン下が、どちらも同じ「戻る」入力としてAndroidに届く場合、アプリから両者を区別できず、両方が右クリックに変換されます。別々に割り当てるには、OSが異なる入力として通知する必要があります。
+                このマウスでは、右ボタンがACTION_BUTTON_PRESSではなく、buttonState=8を含むホバー移動として通知されることを確認しました。そのためbuttonStateの変化を監視して変換します。
             """.trimIndent()
             textSize = 14f
             setPadding(0, 20, 0, 0)
@@ -138,17 +138,19 @@ class MainActivity : Activity() {
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
         if (isMouseEvent(event)) {
             logMouseEvent(event, "Generic")
-            if (isInsideRightClickTestArea(event) &&
-                event.actionButton == MotionEvent.BUTTON_BACK &&
-                (event.actionMasked == MotionEvent.ACTION_BUTTON_PRESS ||
-                 event.actionMasked == MotionEvent.ACTION_BUTTON_RELEASE)
-            ) {
-                if (event.actionMasked == MotionEvent.ACTION_BUTTON_PRESS) {
+            val inTestArea = isInsideRightClickTestArea(event)
+            val backDown = event.buttonState and MotionEvent.BUTTON_BACK != 0
+
+            if (inTestArea && backDown) {
+                if (!backButtonWasDown) {
                     rightClickTestArea.performContextClick()
-                    addLog("物理ボタン「戻る」→ アプリ内右クリックに変換")
+                    addLog("変換: buttonStateの戻る(8)を右クリックとして処理")
                 }
+                backButtonWasDown = true
                 return true
             }
+
+            if (!backDown) backButtonWasDown = false
         }
         return super.dispatchGenericMotionEvent(event)
     }
