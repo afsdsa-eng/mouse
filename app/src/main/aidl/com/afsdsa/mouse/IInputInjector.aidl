@@ -1,6 +1,8 @@
 package com.afsdsa.mouse;
 
+import android.view.MotionEvent;
+
 interface IInputInjector {
-    boolean injectMotion(int action, float x, float y, int metaState, int buttonState, int source, long downTime, long eventTime);
+    boolean injectMotion(in MotionEvent event, int buttonState, int actionButton);
     boolean injectKey(int action, int keyCode, int metaState, long eventTime);
 }
