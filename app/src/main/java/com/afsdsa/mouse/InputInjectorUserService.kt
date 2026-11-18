@@ -1,6 +1,5 @@
 package com.afsdsa.mouse
 
-import android.hardware.input.InputManager
 import android.view.InputEvent
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -32,7 +31,7 @@ class InputInjectorUserService : IInputInjector.Stub() {
             event.source = source
             event.buttonState = buttonState
             try {
-                injectMethod.invoke(inputManagerGlobal, event, InputManager.INJECT_INPUT_EVENT_MODE_ASYNC) as Boolean
+                injectMethod.invoke(inputManagerGlobal, event, 0) as Boolean
             } finally {
                 event.recycle()
             }
