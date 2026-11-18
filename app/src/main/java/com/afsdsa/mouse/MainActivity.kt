@@ -73,6 +73,17 @@ class MainActivity : Activity() {
             text = "Shizuku権限を確認・許可"
             setOnClickListener { requestShizukuPermission() }
         })
+        root.addView(Button(this).apply {
+            text = "マウス変換サービスを有効にする"
+            setOnClickListener {
+                startActivity(android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
+        })
+        root.addView(TextView(this).apply {
+            text = "Android 14以降: アクセシビリティ設定で「マウスボタン変更」をONにすると、Shizuku接続後にマウス入力変換を開始します。"
+            textSize = 13f
+            setPadding(0, 4, 0, 12)
+        })
         root.addView(TextView(this).apply {
             text = "Shizukuが未起動の場合は、Shizukuアプリでワイヤレスデバッグから起動してください。"
             textSize = 13f
