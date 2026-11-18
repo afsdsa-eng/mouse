@@ -22,18 +22,21 @@ class InputInjectorUserService : IInputInjector.Stub() {
         cls.getDeclaredMethod("getInstance").invoke(null)
     }
 
-    override fun injectMotion(
-        action: Int, x: Float, y: Float, metaState: Int, buttonState: Int,
-        source: Int, downTime: Long, eventTime: Long
-    ): Boolean {
+    override fun injectMotion(event: MotionEvent, buttonState: Int, actionButton: Int): Boolean {
         return runCatching {
-            val event = MotionEvent.obtain(downTime, eventTime, action, x, y, metaState)
-            event.source = source
-            event.buttonState = buttonState
+            val copy = MotionEvent.obtain(event)
             try {
-                injectMethod.invoke(inputManagerGlobal, event, 0) as Boolean
+                val setButtonState = MotionEvent::class.java.getDeclaredMethod("setButtonState", Int::class.javaPrimitiveType)
+                setButtonState.isAccessible = true
+                setButtonState.invoke(copy, buttonState)
+                if (actionButton != 0) {
+                    val setActionButton = MotionEvent::class.java.getDeclaredMethod("setActionButton", Int::class.javaPrimitiveType)
+                    setActionButton.isAccessible = true
+                    setActionButton.invoke(copy, actionButton)
+                }
+                injectMethod.invoke(inputManagerGlobal, copy, 0) as Boolean
             } finally {
-                event.recycle()
+                copy.recycle()
             }
         }.getOrDefault(false)
     }
