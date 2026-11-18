@@ -29,11 +29,9 @@ class InputInjectorUserService : IInputInjector.Stub() {
                 val setButtonState = MotionEvent::class.java.getDeclaredMethod("setButtonState", Int::class.javaPrimitiveType)
                 setButtonState.isAccessible = true
                 setButtonState.invoke(copy, buttonState)
-                if (actionButton != 0) {
-                    val setActionButton = MotionEvent::class.java.getDeclaredMethod("setActionButton", Int::class.javaPrimitiveType)
-                    setActionButton.isAccessible = true
-                    setActionButton.invoke(copy, actionButton)
-                }
+                val setActionButton = MotionEvent::class.java.getDeclaredMethod("setActionButton", Int::class.javaPrimitiveType)
+                setActionButton.isAccessible = true
+                setActionButton.invoke(copy, actionButton)
                 injectMethod.invoke(inputManagerGlobal, copy, 0) as Boolean
             } finally {
                 copy.recycle()
@@ -45,7 +43,7 @@ class InputInjectorUserService : IInputInjector.Stub() {
         return runCatching {
             val event = KeyEvent(eventTime, eventTime, action, keyCode, 0, metaState)
             try {
-                injectMethod.invoke(inputManagerGlobal, event, InputManager.INJECT_INPUT_EVENT_MODE_ASYNC) as Boolean
+                injectMethod.invoke(inputManagerGlobal, event, 0) as Boolean
             } finally {
                 event.recycle()
             }
