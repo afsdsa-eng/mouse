@@ -83,7 +83,7 @@ class MouseAccessibilityService : AccessibilityService() {
             MotionEvent.BUTTON_FORWARD to "forward"
         )
         mappings.forEach { (mask, key) ->
-            if (event.buttonState and mask != 0) {
+            if (event.buttonState and mask != 0 || event.actionButton == mask) {
                 val choice = prefs.getInt(key, 0)
                 val outputMask = when (choice) {
                     1 -> MotionEvent.BUTTON_PRIMARY
