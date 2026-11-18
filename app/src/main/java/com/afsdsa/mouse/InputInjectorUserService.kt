@@ -42,11 +42,7 @@ class InputInjectorUserService : IInputInjector.Stub() {
     override fun injectKey(action: Int, keyCode: Int, metaState: Int, eventTime: Long): Boolean {
         return runCatching {
             val event = KeyEvent(eventTime, eventTime, action, keyCode, 0, metaState)
-            try {
-                injectMethod.invoke(inputManagerGlobal, event, 0) as Boolean
-            } finally {
-                event.recycle()
-            }
+            injectMethod.invoke(inputManagerGlobal, event, 0) as Boolean
         }.getOrDefault(false)
     }
 }
