@@ -74,6 +74,7 @@ class MouseAccessibilityService : AccessibilityService() {
         val bridge = injector ?: return
         val prefs = getSharedPreferences("mapping", MODE_PRIVATE)
         var mappedState = event.buttonState
+        var mappedActionButton = event.actionButton
         val mappings = listOf(
             MotionEvent.BUTTON_PRIMARY to "left",
             MotionEvent.BUTTON_SECONDARY to "right",
@@ -95,6 +96,7 @@ class MouseAccessibilityService : AccessibilityService() {
                     else -> mask
                 }
                 mappedState = mappedState and mask.inv() or outputMask
+                if (event.actionButton == mask) mappedActionButton = outputMask
                 if (choice == 6 || choice == 7) {
                     val wasDown = event.actionMasked == MotionEvent.ACTION_BUTTON_PRESS ||
                         event.actionMasked == MotionEvent.ACTION_DOWN
@@ -111,10 +113,7 @@ class MouseAccessibilityService : AccessibilityService() {
         }
         // Every captured event must be forwarded: Android does not deliver captured sources
         // to other apps. The injected copy carries the remapped button state.
-        bridge.injectMotion(
-            event.action, event.x, event.y, event.metaState, mappedState,
-            event.source, event.downTime, event.eventTime
-        )
+        bridge.injectMotion(event, mappedState, mappedActionButton)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
