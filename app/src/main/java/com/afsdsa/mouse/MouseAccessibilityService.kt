@@ -3,6 +3,7 @@ package com.afsdsa.mouse
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.ComponentName
+import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.IBinder
@@ -17,7 +18,7 @@ class MouseAccessibilityService : AccessibilityService() {
     private var injector: IInputInjector? = null
     private var bound = false
 
-    private val connection = object : Shizuku.UserServiceConnection {
+    private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, service: IBinder) {
             injector = IInputInjector.Stub.asInterface(service)
             bound = true
